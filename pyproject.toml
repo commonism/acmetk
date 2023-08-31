@@ -22,7 +22,7 @@ dependencies = [
     "sqlalchemy",
     "trustme",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "MIT"}
 classifiers = [
