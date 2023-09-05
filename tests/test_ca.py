@@ -7,6 +7,7 @@ import shutil
 import unittest
 import unittest.mock
 from pathlib import Path
+import sys
 
 import acme.messages
 
@@ -624,6 +625,9 @@ class TestOurClient:
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
+        if sys.version_info < (3, 11):
+            return
+        # TaskGroups are >= 3.11
         clients_csr = []  # (client, csr) tuples
         async with asyncio.TaskGroup() as tg:
             for i in range(10):
