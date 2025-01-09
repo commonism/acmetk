@@ -1,14 +1,17 @@
 import collections
+import logging
 
 import aiohttp_jinja2
 import cryptography
 import sqlalchemy
+import sqlalchemy.ext.asyncio
 import sqlalchemy.dialects.postgresql
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, defer, defaultload
 from sqlalchemy.sql import text
 
 import aiohttp.web
+
 
 from acmetk.models import (
     Change,
@@ -24,12 +27,43 @@ from acmetk.server.routes import routes
 from acmetk.util import PerformanceMeasurementSystem
 from .pagination import paginate
 
+logger = logging.getLogger(__name__)
+
 
 class AcmeManagementMixin:
+    MGMT_GROUP = "it-admins"
+    GROUPS_HEADER = "X-Forwarded-Groups"
+
     async def _session(
         self, request: aiohttp.web.Request
     ) -> sqlalchemy.ext.asyncio.AsyncSession:
         pass
+
+    @aiohttp.web.middleware
+    async def mgmt_auth_middleware(self, request: aiohttp.web.Request, handler):
+        """Middleware that checks whether the request has a x-auth-request-groups header
+        :returns:
+            * HTTP status code *403* if the header is missing
+        """
+
+        if not request.path.startswith("/mgmt"):
+            return await handler(request)
+        else:
+            return await handler(request)
+
+        import json
+
+        headers = {str(k): str(v) for k, v in request.headers.items()}
+        logger.debug("headers: %s", json.dumps(headers))
+        if (
+            groups := request.headers.get(self.GROUPS_HEADER)
+        ) is None or self.MGMT_GROUP not in groups.split(","):
+            return aiohttp.web.Response(
+                status=403,
+                text=f"{type(self).__name__}: This service requires {self.GROUPS_HEADER} & {self.MGMT_GROUP}"
+                " Please contact your system administrator.\n" + json.dumps(headers),
+            )
+        return await handler(request)
 
     @routes.get("/mgmt", name="mgmt-index")
     @aiohttp_jinja2.template("index.jinja2")

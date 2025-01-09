@@ -166,7 +166,7 @@ class AcmeEABMixin:
     """
 
     CLIENT_CERT_HEADER = "ssl-client-cert"
-    CLIENT_EMAIL_HEADER = "x-auth-request-email"
+    CLIENT_EMAIL_HEADER = "X-Forwarded-Email"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -252,11 +252,14 @@ class AcmeEABMixin:
             request.headers.get(self.CLIENT_CERT_HEADER) is None
             and request.headers.get(self.CLIENT_EMAIL_HEADER) is None
         ):
+            import json
+
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
             response.text = (
                 "An External Account Binding may only be created if a valid client certificate "
                 "is sent with the request or the request is authenticated and a the username supplied."
+                + json.dumps({str(k): str(v) for k, v in request.headers.items()})
             )
             return response
 

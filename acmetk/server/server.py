@@ -42,6 +42,8 @@ from acmetk.server.routes import routes
 from acmetk.version import __version__
 from acmetk.plugin_base import PluginRegistry
 
+import acmetk
+
 if typing.TYPE_CHECKING:
     import aiohttp
 
@@ -156,6 +158,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             middlewares=[
                 self.error_middleware,
                 self.host_ip_middleware,
+                self.mgmt_auth_middleware,
                 self.aiohttp_jinja2_middleware,
             ]
         )
