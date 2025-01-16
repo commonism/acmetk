@@ -223,33 +223,32 @@ class Database:
     async def get_challenge(
         session: AsyncSession, account_id, challenge_id
     ) -> typing.Optional[models.Challenge]:
-        challenge = aliased(Challenge, flat=True)
-        identifier = aliased(Identifier, flat=True)
-        order = aliased(Order, flat=True)
-        account = aliased(Account, flat=True)
         statement = (
-            select(challenge)
+            select(Challenge)
             .options(
-                selectinload(challenge.authorization).options(
+                selectinload(Challenge.authorization).options(
                     selectinload(Authorization.challenges),
-                    selectinload(Authorization.identifier.of_type(identifier)).options(
-                        selectinload(identifier.authorization),
-                        selectinload(identifier.order.of_type(order))
-                        .selectinload(order.identifiers.of_type(identifier))
-                        .joinedload(identifier.authorization),
+                    selectinload(Authorization.identifier.of_type(Identifier)).options(
+                        selectinload(Identifier.authorization),
+                        selectinload(Identifier.order.of_type(Order)).options(
+                            selectinload(
+                                Order.identifiers.of_type(Identifier)
+                            ).joinedload(Identifier.authorization),
+                            selectinload(Order.account.of_type(Account)),
+                        ),
                     ),
                 )
             )
             .join(
                 Authorization,
-                challenge.authorization_id == Authorization.authorization_id,
+                Challenge.authorization_id == Authorization.authorization_id,
             )
-            .join(identifier, Authorization.identifier_id == identifier.identifier_id)
-            .join(order, identifier.order_id == order.order_id)
-            .join(account, order.account_id == account.account_id)
+            .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
+            .join(Order, Identifier.order_id == Order.order_id)
+            .join(Account, Order.account_id == Account.account_id)
             .filter(
-                (account_id == account.account_id)
-                & (challenge.challenge_id == challenge_id)
+                (account_id == Account.account_id)
+                & (Challenge.challenge_id == challenge_id)
             )
         )
         try:
