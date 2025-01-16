@@ -191,24 +191,23 @@ class Database:
     async def get_authz(
         session: AsyncSession, account_id, authz_id
     ) -> typing.Optional[models.Authorization]:
-        authorization = aliased(Authorization, flat=True)
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
         identifier = aliased(Identifier, flat=True)
         statement = (
-            select(authorization)
+            select(Authorization)
             .options(
-                selectinload(authorization.identifier.of_type(identifier))
-                .selectinload(identifier.order)
+                selectinload(Authorization.identifier)
+                .selectinload(Identifier.order)
                 .selectinload(Order.account),
-                selectinload(authorization.challenges),
+                selectinload(Authorization.challenges),
             )
-            .join(identifier, authorization.identifier_id == identifier.identifier_id)
+            .join(identifier, Authorization.identifier_id == identifier.identifier_id)
             .join(order, identifier.order_id == order.order_id)
             .join(account, order.account_id == account.account_id)
             .filter(
                 (account_id == account.account_id)
-                & (authorization.authorization_id == authz_id)
+                & (Authorization.authorization_id == authz_id)
             )
         )
         try:
@@ -223,31 +222,36 @@ class Database:
     async def get_challenge(
         session: AsyncSession, account_id, challenge_id
     ) -> typing.Optional[models.Challenge]:
+        authorization = aliased(Authorization, flat=True)
+        identifier = aliased(Identifier, flat=True)
+        order = aliased(Order, flat=True)
+        account = aliased(Account, flat=True)
+
         statement = (
             select(Challenge)
             .options(
                 selectinload(Challenge.authorization).options(
                     selectinload(Authorization.challenges),
-                    selectinload(Authorization.identifier.of_type(Identifier)).options(
-                        selectinload(Identifier.authorization),
-                        selectinload(Identifier.order.of_type(Order)).options(
-                            selectinload(
-                                Order.identifiers.of_type(Identifier)
-                            ).joinedload(Identifier.authorization),
-                            selectinload(Order.account.of_type(Account)),
+                    selectinload(Authorization.identifier).options(
+                        selectinload(Identifier.order).options(
+                            selectinload(Order.account),
+                            selectinload(Order.identifiers).selectinload(
+                                Identifier.authorization
+                            ),
                         ),
+                        selectinload(Identifier.authorization),
                     ),
                 )
             )
             .join(
-                Authorization,
-                Challenge.authorization_id == Authorization.authorization_id,
+                authorization,
+                Challenge.authorization_id == authorization.authorization_id,
             )
-            .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
-            .join(Order, Identifier.order_id == Order.order_id)
-            .join(Account, Order.account_id == Account.account_id)
+            .join(identifier, authorization.identifier_id == identifier.identifier_id)
+            .join(order, identifier.order_id == order.order_id)
+            .join(account, order.account_id == account.account_id)
             .filter(
-                (account_id == Account.account_id)
+                (account_id == account.account_id)
                 & (Challenge.challenge_id == challenge_id)
             )
         )
@@ -257,7 +261,10 @@ class Database:
             # challenge_id is not a valid UUID
             raise web.HTTPNotFound
 
-        return result[0] if result else None
+        v = result[0] if result else None
+        if v:
+            assert v.authorization.identifier.order.account
+        return v
 
     @staticmethod
     async def get_order(
@@ -291,11 +298,7 @@ class Database:
         if account_id and certificate_id:
             statement = (
                 select(Certificate)
-                .options(
-                    selectinload(Certificate.order.of_type(order)).selectinload(
-                        order.account
-                    )
-                )
+                .options(selectinload(Certificate.order).selectinload(Order.account))
                 .join(order, Certificate.order_id == order.order_id)
                 .join(account, order.account_id == account.account_id)
                 .filter(
@@ -307,11 +310,7 @@ class Database:
             statement = (
                 select(Certificate)
                 .filter(Certificate.cert == certificate)
-                .options(
-                    selectinload(Certificate.order.of_type(order)).selectinload(
-                        order.account
-                    )
-                )
+                .options(selectinload(Certificate.order).selectinload(Order.account))
                 .join(order, Certificate.order_id == order.order_id)
                 .join(account, order.account_id == account.account_id)
             )
