@@ -208,8 +208,10 @@ class AcmeManagementMixin:
             q = (
                 select(Account)
                 .options(
-                    selectinload(Account.orders),
-                    selectinload(Account.changes).selectinload(Change.entity),
+                    selectinload(Account.orders)
+                    .joinedload(Order.identifiers)
+                    .joinedload(Identifier.authorization),
+                    selectinload(Account.changes).joinedload(Change.entity),
                 )
                 .filter(Account.account_id == account)
             )
