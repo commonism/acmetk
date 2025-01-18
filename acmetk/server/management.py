@@ -188,8 +188,10 @@ class AcmeManagementMixin:
 
             q = (
                 select(Account)
-                .options(selectinload(Account.orders))
-                .options(selectinload(Account.changes).selectinload(Change.entity))
+                .options(
+                    selectinload(Account.orders),
+                    selectinload(Account.changes).selectinload(Change.entity),
+                )
                 .order_by(Account._entity.desc())
             )
 
@@ -323,10 +325,11 @@ class AcmeManagementMixin:
                 .options(
                     defer(Certificate.cert),
                     selectinload(Certificate.changes).options(defer(Change.data)),
-                    selectinload(Certificate.order)
-                    .options(defer(Order.csr), selectinload(Order.identifiers))
-                    .selectinload(Order.account)
-                    .options(defer(Account.key)),
+                    selectinload(Certificate.order).options(
+                        defer(Order.csr),
+                        selectinload(Order.identifiers),
+                        selectinload(Order.account).options(defer(Account.key)),
+                    ),
                 )
                 .order_by(Certificate._entity.desc())
             )
